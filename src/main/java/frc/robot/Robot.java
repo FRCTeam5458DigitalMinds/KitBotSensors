@@ -7,8 +7,8 @@ package frc.robot;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.motorcontrol.MotorController;
 import edu.wpi.first.wpilibj.motorcontrol.MotorControllerGroup;
-import edu.wpi.first.networktables.NetworkTable;
-import edu.wpi.first.networktables.NetworkTableEntry;
+//import edu.wpi.first.networktables.NetworkTable;
+//import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -34,7 +34,9 @@ public class Robot extends TimedRobot {
   private boolean m_LimelightHasValidTarget = false;
   private double m_LimelightDriveCommand = 0.0;
   private double m_LimelightSteerCommand = 0.0;
-
+  private double speed = 0.4;
+  private double r_speed = speed;
+  private double l_speed = speed;
 
   CANSparkMax FrontLeftMotor = new CANSparkMax(1, MotorType.kBrushless); 
   CANSparkMax FrontRightMotor = new CANSparkMax(2, MotorType.kBrushless); 
@@ -121,18 +123,21 @@ public class Robot extends TimedRobot {
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
-    SmartDashboard.putString("DB/String 0", "hi" );
     Update_Limelight_Tracking();
 
     if (m_LimelightHasValidTarget)
           {
-                m_Drive.tankDrive(m_LimelightSteerCommand,m_LimelightDriveCommand);
+                m_Drive.tankDrive(l_speed, -r_speed);
+                SmartDashboard.putString("DB/String 0", "yes" );
+
               // n_Drive.tankDrive(m_LimelightDriveCommand,m_LimelightSteerCommand);
           }
           else
           {
                // n_Drive.tankDrive(0.1,0.1);
-                m_Drive.tankDrive(0.0,0.0);
+                m_Drive.tankDrive(0.0, 0.0);
+                SmartDashboard.putString("DB/String 0", "no" );
+
           }
   }
 
@@ -149,10 +154,7 @@ public class Robot extends TimedRobot {
   public void Update_Limelight_Tracking()
   {
         // These numbers must be tuned for your Robot!  Be careful!
-        final double STEER_K = 0.03;                    // how hard to turn toward the target
-        final double DRIVE_K = 0.26;                    // how hard to drive fwd toward the target
-        final double DESIRED_TARGET_AREA = 13.0;        // Area of the target when the robot reaches the wall
-        final double MAX_DRIVE = 0.7;                   // Simple speed limit so we don't drive too fast
+                  // Simple speed limit so we don't drive too fast
 
         double tv = NetworkTableInstance.getDefault().getTable("limelight").getEntry("tv").getDouble(0);
         double tx = NetworkTableInstance.getDefault().getTable("limelight").getEntry("tx").getDouble(0);
@@ -173,18 +175,28 @@ public class Robot extends TimedRobot {
         m_LimelightHasValidTarget = true;
 
         // Start with proportional steering
-        double steer_cmd = tx * STEER_K;
-        m_LimelightSteerCommand = steer_cmd;
+        if (tx > 2) {
+          l_speed = speed;
+          r_speed -= speed*(tx * 0.02);
+          r_speed *= 0.8;
+          SmartDashboard.putNumber("DB/String 6", r_speed);
+          
+        }
+        if (tx < -2) {
+          r_speed = speed;
+          l_speed = speed*(tx * 0.02);
+          l_speed *= 0.8;
+            SmartDashboard.putNumber("DB/String 7", l_speed);
+            l_speed = 0;
+        }
+        if (tx < 2 && tx > -2) {
+          SmartDashboard.putNumber("DB/String 6", r_speed);
+          SmartDashboard.putNumber("DB/String 7", l_speed);
+          r_speed = speed;
+          l_speed = speed;
+        }
 
         // try to drive forward until the target area reaches our desired area
-        double drive_cmd = (DESIRED_TARGET_AREA - ta) * DRIVE_K;
-
-        // don't let the robot drive too fast into the goal
-        if (drive_cmd > MAX_DRIVE)
-        {
-          drive_cmd = MAX_DRIVE;
-        }
-        m_LimelightDriveCommand = drive_cmd;
   }
 
   /** This function is called once when the robot is first started up. */
