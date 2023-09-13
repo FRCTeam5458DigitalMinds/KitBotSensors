@@ -17,8 +17,8 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 
-
-
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -26,15 +26,14 @@ import com.revrobotics.CANSparkMaxLowLevel.MotorType;
  * the package after creating this project, you must also update the build.gradle file in the
  * project.
  */
+
 public class Robot extends TimedRobot {
   private Command m_autonomousCommand;
 
   private RobotContainer m_robotContainer;
 
   private boolean m_LimelightHasValidTarget = false;
-  private double m_LimelightDriveCommand = 0.0;
-  private double m_LimelightSteerCommand = 0.0;
-  private double speed = 0.4;
+  private double speed = 0.5;
   private double r_speed = speed;
   private double l_speed = speed;
 
@@ -70,6 +69,7 @@ public class Robot extends TimedRobot {
     BackLeftMotor.setSmartCurrentLimit(80); 
     BackRightMotor.setSmartCurrentLimit(80); 
   }
+
 
   /**
    * This function is called every 20 ms, no matter the mode. Use this for items like diagnostics
@@ -164,11 +164,9 @@ public class Robot extends TimedRobot {
         SmartDashboard.putString("DB/String 2", String.valueOf(tx));
         SmartDashboard.putString("DB/String 3", String.valueOf(ty));
         SmartDashboard.putString("DB/String 4", String.valueOf(ta));
-        if (tv < 1.0)
+        if (tv < 1.0 || ta > 1)
         {
           m_LimelightHasValidTarget = false;
-          m_LimelightDriveCommand = 0.0;
-          m_LimelightSteerCommand = 0.0;
           return;
         }
 
@@ -176,18 +174,15 @@ public class Robot extends TimedRobot {
 
         // Start with proportional steering
         if (tx > 2) {
-          l_speed = speed;
-          r_speed -= speed*(tx * 0.02);
-          r_speed *= 0.8;
+          l_speed = speed + 0.1;
+          r_speed = speed*(tx * 0.02) + 0.3;
           SmartDashboard.putNumber("DB/String 6", r_speed);
           
         }
         if (tx < -2) {
-          r_speed = speed;
-          l_speed = speed*(tx * 0.02);
-          l_speed *= 0.8;
-            SmartDashboard.putNumber("DB/String 7", l_speed);
-            l_speed = 0;
+          r_speed = speed + 0.1;
+          l_speed = speed*(-tx * 0.02) + 0.3;
+          SmartDashboard.putNumber("DB/String 7", l_speed);
         }
         if (tx < 2 && tx > -2) {
           SmartDashboard.putNumber("DB/String 6", r_speed);
