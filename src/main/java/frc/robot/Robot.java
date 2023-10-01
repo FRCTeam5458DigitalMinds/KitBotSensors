@@ -33,6 +33,9 @@ public class Robot extends TimedRobot {
   private RobotContainer m_robotContainer;
 
   private boolean m_LimelightHasValidTarget = false;
+  private boolean m_ApproachTarget = false;
+  private boolean m_BackAwayFromTarget = false;
+
   private double speed = 0.5;
   private double r_speed = speed;
   private double l_speed = speed;
@@ -123,22 +126,41 @@ public class Robot extends TimedRobot {
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
-    Update_Limelight_Tracking();
+  //Calls the limelight get values function as seen below
+  //Important to have before the rest of teleop
+  Update_Limelight_Tracking();
 
-    if (m_LimelightHasValidTarget)
-          {
-                m_Drive.tankDrive(l_speed, -r_speed);
-                SmartDashboard.putString("DB/String 0", "yes" );
+  //If the limelight detects an april tag and the Id is the one you are looking for
+  //Activate drive code
+  if (m_LimelightHasValidTarget && desired_Id(4))
+    {
+      //m_ApproachTarget is set in the limelight tracking function
+      //detects how much of the april tag's area it can read and serves as distance tracker
+      if (m_ApproachTarget)
+      {
+        //sets kitbot to drive towards the april tag, speed declared in Limelight Tracking
+        m_Drive.tankDrive(l_speed, -r_speed);
+        
+        //prints robot status to smart dashboard
+        SmartDashboard.putString("DB/String 0", "approaching target..." );
+      }
+      else if (m_BackAwayFromTarget) 
+      {
+        //sets kitbot to drive away from the april tag, speed declared in Limelight Tracking
+        m_Drive.tankDrive(-l_speed, r_speed);
 
-              // n_Drive.tankDrive(m_LimelightDriveCommand,m_LimelightSteerCommand);
-          }
-          else
-          {
-               // n_Drive.tankDrive(0.1,0.1);
-                m_Drive.tankDrive(0.0, 0.0);
-                SmartDashboard.putString("DB/String 0", "no" );
+        //prints robot status to smart dashboard
+        SmartDashboard.putString("DB/String 0", "backing away from target..." );
+      }
+    }
+    else
+    {
+      //if there are no valid april tags in sight of limelight drivetrain is to turn off
+      m_Drive.tankDrive(0.0, 0.0);
 
-          }
+      //prints robot status to dashboard
+      SmartDashboard.putString("DB/String 0", "no valid target..." );
+    }
   }
 
   @Override
@@ -151,47 +173,94 @@ public class Robot extends TimedRobot {
   @Override
   public void testPeriodic() {}
 
+  public double get_Distance_Limelight()
+  {
+    double ty = NetworkTableInstance.getDefault().getTable("limelight").getEntry("ty").getDouble(0);
+    double targetOffsetAngle_Vertical = ty;
+
+    //sets up variables for limelight placement to be used it math later
+    //zeroes are placeholders as of 9/12 7:42 PM
+    double mountD = 0;
+    double lensH = 0;
+    double goalH = 0;
+
+    double angleToGoalDegrees = mountD + targetOffsetAngle_Vertical;
+    double angleToGoalRadians = angleToGoalDegrees * (3.14159 / 180.0);
+
+    //calculate distance
+    return (goalH - lensH)/Math.tan(angleToGoalRadians);
+  }
+  public boolean desired_Id(int check_Id)
+  {
+    //this function takes in an int as an ID to check against the ID of the april tag the limelight reads
+    double tid = NetworkTableInstance.getDefault().getTable("limelight").getEntry("tid").getDouble(0);
+    if (tid == check_Id)
+    {
+      //this function returns true if the desired ID and the actual ID matches.
+      return true;
+    }
+    return false;
+  }
   public void Update_Limelight_Tracking()
   {
-        // These numbers must be tuned for your Robot!  Be careful!
-                  // Simple speed limit so we don't drive too fast
+    //get values from the limelight
+    //if tv = 1 then limelight sees tag, else no tag detected
+    double tv = NetworkTableInstance.getDefault().getTable("limelight").getEntry("tv").getDouble(0);
 
-        double tv = NetworkTableInstance.getDefault().getTable("limelight").getEntry("tv").getDouble(0);
-        double tx = NetworkTableInstance.getDefault().getTable("limelight").getEntry("tx").getDouble(0);
-        double ty = NetworkTableInstance.getDefault().getTable("limelight").getEntry("ty").getDouble(0);
-        double ta = NetworkTableInstance.getDefault().getTable("limelight").getEntry("ta").getDouble(0);
-        SmartDashboard.putString("DB/String 1", String.valueOf(tv));
-        SmartDashboard.putString("DB/String 2", String.valueOf(tx));
-        SmartDashboard.putString("DB/String 3", String.valueOf(ty));
-        SmartDashboard.putString("DB/String 4", String.valueOf(ta));
-        if (tv < 1.0 || ta > 1)
-        {
-          m_LimelightHasValidTarget = false;
-          return;
-        }
+    //horizontal displacement angle of april tag to limelight, -27 to +27
+    double tx = NetworkTableInstance.getDefault().getTable("limelight").getEntry("tx").getDouble(0);
 
-        m_LimelightHasValidTarget = true;
+    //vertical displacement angle of april tage to limelight
+    double ty = NetworkTableInstance.getDefault().getTable("limelight").getEntry("ty").getDouble(0);
 
-        // Start with proportional steering
-        if (tx > 2) {
-          l_speed = speed + 0.1;
-          r_speed = speed*(tx * 0.02) + 0.3;
-          SmartDashboard.putNumber("DB/String 6", r_speed);
-          
-        }
-        if (tx < -2) {
-          r_speed = speed + 0.1;
-          l_speed = speed*(-tx * 0.02) + 0.3;
-          SmartDashboard.putNumber("DB/String 7", l_speed);
-        }
-        if (tx < 2 && tx > -2) {
-          SmartDashboard.putNumber("DB/String 6", r_speed);
-          SmartDashboard.putNumber("DB/String 7", l_speed);
-          r_speed = speed;
-          l_speed = speed;
-        }
+    //how much of the april tag's area can the limelight see
+    double ta = NetworkTableInstance.getDefault().getTable("limelight").getEntry("ta").getDouble(0);
 
-        // try to drive forward until the target area reaches our desired area
+    //put strings to dashboard
+    SmartDashboard.putString("DB/String 1", String.valueOf(tv));
+    SmartDashboard.putString("DB/String 2", String.valueOf(tx));
+    SmartDashboard.putString("DB/String 3", String.valueOf(ty));
+    SmartDashboard.putString("DB/String 4", String.valueOf(ta));
+
+    if (tv < 1.0)
+    {
+      m_LimelightHasValidTarget = false;
+      return;
+    }
+
+    if (ta < 1.0)
+    {
+      m_BackAwayFromTarget = true;
+      m_ApproachTarget = false;
+    }
+    else if (ta > 1.0 && ta < 1.4) 
+    {
+      m_BackAwayFromTarget = false;
+      m_ApproachTarget = false;
+    }
+    else {
+      m_ApproachTarget = true;
+      m_BackAwayFromTarget = false;
+    }
+    
+    // Start with proportional steering
+    if (tx > 2) {
+      l_speed = speed + 0.1;
+      r_speed = speed*(tx * 0.02) + 0.3;
+      SmartDashboard.putNumber("DB/String 6", r_speed);
+      
+    }
+    if (tx < -2) {
+      r_speed = speed + 0.1;
+      l_speed = speed*(-tx * 0.02) + 0.3;
+      SmartDashboard.putNumber("DB/String 7", l_speed);
+    }
+    if (tx < 2 && tx > -2) {
+      SmartDashboard.putNumber("DB/String 6", r_speed);
+      SmartDashboard.putNumber("DB/String 7", l_speed);
+      r_speed = speed;
+      l_speed = speed;
+    }
   }
 
   /** This function is called once when the robot is first started up. */
